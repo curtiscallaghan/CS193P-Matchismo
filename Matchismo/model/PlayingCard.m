@@ -40,7 +40,7 @@
 
 + (NSArray *)validSuits
 {
-    return @[@"♠︎",@"♣︎",@"♥︎",@"♦︎"];
+    return @[@"♠️",@"♥️",@"♦️",@"♣️"];
 }
 
 + (NSArray *)rankStrings
@@ -60,6 +60,16 @@
         }
         else if ([otherCard.suit isEqualToString:self.suit]) {
             score = 1;
+        }
+    }
+    else if ([otherCards count] == 2) {
+        for (PlayingCard *otherCard in otherCards) {
+            if (otherCard.rank == self.rank) {
+                score += 4;
+            }
+            else if ([otherCard.suit isEqualToString:self.suit]) {
+                score += 1;
+            }
         }
     }
     

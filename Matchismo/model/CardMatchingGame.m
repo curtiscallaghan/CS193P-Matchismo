@@ -10,7 +10,10 @@
 
 @interface CardMatchingGame ()
 @property (nonatomic, readwrite) NSInteger score;
+@property (nonatomic, readwrite) NSUInteger mode;
 @property (strong, nonatomic) NSMutableArray *cards; // of Card
+@property (strong, nonatomic, readwrite) NSString *lastConsideration;
+@property (strong, nonatomic) NSMutableArray *cardsToMatch; // of Card
 @end
 
 static const int MISMATCH_PENALTY = 2;
@@ -25,12 +28,20 @@ static const int COST_TO_CHOOSE = 1;
     return _cards;
 }
 
+- (NSMutableArray *)cardsToMatch
+{
+    if ( !_cardsToMatch ) _cardsToMatch = [[NSMutableArray alloc] init];
+    return _cardsToMatch;
+}
+
 -(instancetype)initWithCardCount:(NSUInteger)count
                        usingDeck:(Deck*)deck
+               matchingCardsMode:(NSUInteger)mode
 {
     self = [super init];
     
     if (self) {
+        self.mode = mode;
         for (int i = 0; i < count; i++) {
             Card *card = [deck drawRandomCard];
             if (card) {
@@ -52,6 +63,8 @@ static const int COST_TO_CHOOSE = 1;
 
 - (void)chooseCardAtIndex:(NSUInteger)index
 {
+    self.lastConsideration = nil;
+    
     Card *card = [self cardAtIndex:index];
     
     if (!card.isMatched) {
@@ -59,17 +72,50 @@ static const int COST_TO_CHOOSE = 1;
             card.chosen = NO;
         } else {
             
-            for (Card *otherCard in self.cards) {
-                if (otherCard.isChosen && !otherCard.isMatched) {
-                    int matchScore = [card match:@[otherCard]];
+            if (self.mode == 2) {
+            
+                for (Card *otherCard in self.cards) {
+                    if (otherCard.isChosen && !otherCard.isMatched) {
+                        int matchScore = [card match:@[otherCard]];
+                        if (matchScore) {
+                            self.score += matchScore * MATCH_BONUS;
+                            otherCard.matched = card.matched = YES;
+                            self.lastConsideration = [NSString stringWithFormat:@"Matched %@ %@ for %d points.", card.contents, otherCard.contents, matchScore * MATCH_BONUS];
+                        } else {
+                            self.score -= MISMATCH_PENALTY;
+                            otherCard.chosen = NO;
+                            self.lastConsideration = [NSString stringWithFormat:@"%@ %@ don’t match! %d point penalty!", card.contents, otherCard.contents, MISMATCH_PENALTY];
+                        }
+                        break;
+                    }
+                }
+                
+                if (!self.lastConsideration) {
+                    self.lastConsideration = card.contents;
+                }
+            }
+            else {
+                
+                if ([self.cardsToMatch count] == 2) {
+                    int matchScore = [card match:self.cardsToMatch];
                     if (matchScore) {
                         self.score += matchScore * MATCH_BONUS;
-                        otherCard.matched = card.matched = YES;
-                    } else {
-                        self.score -= MISMATCH_PENALTY;
-                        otherCard.chosen = NO;
+                        for (Card *matchedCard in self.cardsToMatch) {
+                            matchedCard.matched = YES;
+                        }
+                        card.matched = YES;
+                        //self.lastConsideration = [NSString stringWithFormat:@"Matched %@ %@ for %d points.", card.contents, otherCard.contents, matchScore * MATCH_BONUS];
+                        [self.cardsToMatch removeAllObjects];
                     }
-                    break;
+                    else {
+                        self.score -= MISMATCH_PENALTY;
+                        [[self.cardsToMatch firstObject] setChosen:NO];
+                        [self.cardsToMatch removeObjectAtIndex:0];
+                        [self.cardsToMatch addObject:card];
+                    }
+                }
+                else {
+                    [self.cardsToMatch addObject:card];
                 }
             }
             self.score -= COST_TO_CHOOSE;
